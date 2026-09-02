@@ -50,6 +50,7 @@ echo "==> Deploying ${APP_STACK} in ${REGION}"
 OVERRIDES=(
   "Login=${IDC_LOGIN_URL}"
   "CloudTrailAuditLogs=${CLOUDTRAIL_AUDIT_LOGS:-read_write}"
+  "CWLogsAssumeRoleArn=${CWLOGS_ASSUME_ROLE_ARN:-}"
   "teamAdminGroup=${TEAM_ADMIN_GROUP}"
   "teamAuditGroup=${TEAM_AUDITOR_GROUP}"
   "tags=${TAGS:-}"

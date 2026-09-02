@@ -34,6 +34,10 @@
     "vpcSecurityGroupId": {
       "Type": "String",
       "Description": "TEAM Lambda security group"
+    },
+    "CWLogsAssumeRoleArn": {
+      "Type": "String",
+      "Default": ""
     }
   },
   "Conditions": {
@@ -43,6 +47,50 @@
           "Ref": "env"
         },
         "NONE"
+      ]
+    },
+    "IsCWLogsEnabled": {
+      "Fn::Equals": [
+        {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::Split": [
+                "/",
+                {
+                  "Ref": "customcloudtrailLakeEventDataStoreOutput"
+                }
+              ]
+            }
+          ]
+        },
+        "cwlogs:"
+      ]
+    },
+    "IsCWLogsAssumeRoleSet": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "CWLogsAssumeRoleArn"
+            },
+            ""
+          ]
+        }
+      ]
+    },
+    "IsCWLogsSameAccount": {
+      "Fn::And": [
+        {
+          "Condition": "IsCWLogsEnabled"
+        },
+        {
+          "Fn::Not": [
+            {
+              "Condition": "IsCWLogsAssumeRoleSet"
+            }
+          ]
+        }
       ]
     }
   },
@@ -94,6 +142,9 @@
             },
             "EVENT_DATA_STORE": {
               "Ref": "customcloudtrailLakeEventDataStoreOutput"
+            },
+            "CWLOGS_ASSUME_ROLE_ARN": {
+              "Ref": "CWLogsAssumeRoleArn"
             },
             "API_AWSPIM_GRAPHQLAPIIDOUTPUT": {
               "Ref": "apiteamGraphQLAPIIdOutput"
@@ -383,6 +434,90 @@
               ],
               "Resource": [
                 "*"
+              ],
+              "Effect": "Allow"
+            }
+          ]
+        },
+        "Roles": [
+          {
+            "Ref": "LambdaExecutionRole"
+          }
+        ]
+      },
+      "DependsOn": "LambdaExecutionRole"
+    },
+    "CWLogsSameAccountPolicy": {
+      "Condition": "IsCWLogsSameAccount",
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyName": "cwlogs-same-account-policy",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": [
+                "logs:StartQuery"
+              ],
+              "Resource": [
+                {
+                  "Fn::Sub": [
+                    "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${loggroup}:*",
+                    {
+                      "loggroup": {
+                        "Fn::Select": [
+                          1,
+                          {
+                            "Fn::Split": [
+                              "cwlogs://",
+                              {
+                                "Ref": "customcloudtrailLakeEventDataStoreOutput"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ],
+              "Effect": "Allow"
+            },
+            {
+              "Action": [
+                "logs:GetQueryResults"
+              ],
+              "Resource": [
+                "*"
+              ],
+              "Effect": "Allow"
+            }
+          ]
+        },
+        "Roles": [
+          {
+            "Ref": "LambdaExecutionRole"
+          }
+        ]
+      },
+      "DependsOn": "LambdaExecutionRole"
+    },
+    "CWLogsAssumeRolePolicy": {
+      "Condition": "IsCWLogsAssumeRoleSet",
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyName": "cwlogs-assume-role-policy",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": [
+                "sts:AssumeRole"
+              ],
+              "Resource": [
+                {
+                  "Ref": "CWLogsAssumeRoleArn"
+                }
               ],
               "Effect": "Allow"
             }

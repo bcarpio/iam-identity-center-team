@@ -23,7 +23,13 @@ TEAM_ACCOUNT_PROFILE=team_account_profile
 TEAM_ADMIN_GROUP="team_admin_group_name"
 TEAM_AUDITOR_GROUP="team_auditor_group_name"
 TAGS="Environment=nonprod Application=team ManagedBy=cloudformation"
-CLOUDTRAIL_AUDIT_LOGS=read_write
+# read_write/read/write need CloudTrail Lake, closed to new customers; use none or cwlogs://.
+CLOUDTRAIL_AUDIT_LOGS=none
+# CloudTrail Lake is closed to new customers. To query the Control Tower org
+# trail's CloudWatch log group instead (see docs/docs/deployment/configuration/cwlogs.md):
+#   CLOUDTRAIL_AUDIT_LOGS=cwlogs://aws-controltower/CloudTrailLogs-<suffix>
+#   CWLOGS_ASSUME_ROLE_ARN=arn:aws:iam::<management-account>:role/TEAM-CWLogs-Query
+CWLOGS_ASSUME_ROLE_ARN=
 CACHE_TTL=604800
 
 # Private UI hostname (bare, no scheme).

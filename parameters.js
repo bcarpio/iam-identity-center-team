@@ -17,6 +17,7 @@ const {
   COGNITO_DOMAIN_PREFIX,
   LAMBDA_SUBNET_IDS,
   LAMBDA_SECURITY_GROUP_ID,
+  CWLOGS_ASSUME_ROLE_ARN,
 } = process.env;
 
 // Lambda functions that run inside the VPC. Listed explicitly (never globbed)
@@ -212,6 +213,27 @@ async function update_vpc_parameters() {
   }
 }
 
+async function update_cwlogs_parameters() {
+  console.log("updating teamgetLogs/teamqueryLogs CloudWatch Logs Insights parameters...");
+
+  for (const functionName of ["teamgetLogs", "teamqueryLogs"]) {
+    const parametersJsonPath = path.resolve(
+      `./amplify/backend/function/${functionName}/parameters.json`
+    );
+    // Merge rather than overwrite: teamgetLogs also carries the VPC
+    // parameters written by update_vpc_parameters().
+    const parametersJson = fs.existsSync(parametersJsonPath)
+      ? JSON.parse(fs.readFileSync(parametersJsonPath, "utf8"))
+      : {};
+    parametersJson.CWLogsAssumeRoleArn = CWLOGS_ASSUME_ROLE_ARN || "";
+
+    fs.writeFileSync(
+      parametersJsonPath,
+      JSON.stringify(parametersJson, null, 4)
+    );
+  }
+}
+
 update_auth_parameters();
 update_react_parameters();
 update_groups_parameters();
@@ -219,3 +241,4 @@ update_router_parameters()
 update_tag_parameters();
 update_cloudtrail_parameters();
 update_vpc_parameters();
+update_cwlogs_parameters();
