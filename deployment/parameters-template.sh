@@ -12,19 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Copy to parameters.sh (git-ignored) and edit.
+
 IDC_LOGIN_URL=https://d-90676dxxxx.awsapps.com/start
-REGION=us-east-1
+# Must be the IAM Identity Center region (template.yml asserts it).
+REGION=us-east-2
 TEAM_ACCOUNT=123456789101
 ORG_MASTER_PROFILE=org_master_profile
 TEAM_ACCOUNT_PROFILE=team_account_profile
 TEAM_ADMIN_GROUP="team_admin_group_name"
 TEAM_AUDITOR_GROUP="team_auditor_group_name"
-TAGS="project=iam-identity-center-team environment=prod"
-CLOUDTRAIL_AUDIT_LOGS=arn:aws:cloudtrail:us-east-1:123456789101:eventdatastore/e646f20d-7959-4682-be84-6c5b8a37cf15
-SECRET_NAME=TEAM-IDC-APP
+TAGS="Environment=nonprod Application=team ManagedBy=cloudformation"
+CLOUDTRAIL_AUDIT_LOGS=read_write
 CACHE_TTL=604800
 
-# Uncomment the next line only if you have a custom domain
-# UI_DOMAIN=portal.teamtest.online
-
-
+# Private UI hostname (bare, no scheme).
+# Resolves only inside the VPC via a private hosted zone of the same name.
+UI_DOMAIN=team.example.com
+# Certificate: set ONE of these.
+#  - UI_PUBLIC_ZONE_ID: a public Route 53 zone for UI_DOMAIN in the TEAM
+#    account; CloudFormation issues and validates the certificate itself.
+#  - UI_CERTIFICATE_ARN: a certificate already issued in REGION (see
+#    request-cert.sh, or import one from your internal CA).
+UI_PUBLIC_ZONE_ID=
+UI_CERTIFICATE_ARN=
+# Optional extra CIDR (e.g. corporate network over DX/TGW/VPN) allowed to
+# reach the internal ALB on 443. The VPC CIDR is always allowed.
+ALLOWED_CLIENT_CIDR=

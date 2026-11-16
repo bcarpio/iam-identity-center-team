@@ -1,0 +1,87 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  TEAM UI service (stack TEAM-IDC-UI) - nginx container on Fargate behind the
+  internal ALB created by TEAM-IDC-APP. Deployed by the CodeBuild project after
+  it pushes the image.
+
+Parameters:
+  ImageUri:
+    Type: String
+    Description: Full image URI including tag, e.g. <acct>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>
+
+Resources:
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: team-ui
+      RequiresCompatibilities:
+        - FARGATE
+      NetworkMode: awsvpc
+      Cpu: '256'
+      Memory: '512'
+      RuntimePlatform:
+        CpuArchitecture: ARM64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !ImportValue TEAM-UiTaskExecutionRoleArn
+      # No TaskRoleArn: nginx calls no AWS API.
+      # Read-only root filesystem: nginx-unprivileged writes its pid file and
+      # *_temp dirs under /tmp and its cache under /var/cache/nginx, so both
+      # are task-scoped ephemeral volumes.
+      Volumes:
+        - Name: tmp
+        - Name: nginx-cache
+      ContainerDefinitions:
+        - Name: ui
+          Image: !Ref ImageUri
+          Essential: true
+          ReadonlyRootFilesystem: true
+          PortMappings:
+            - ContainerPort: 8080
+              Protocol: tcp
+          MountPoints:
+            - SourceVolume: tmp
+              ContainerPath: /tmp
+              ReadOnly: false
+            - SourceVolume: nginx-cache
+              ContainerPath: /var/cache/nginx
+              ReadOnly: false
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: /team/ui
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ui
+
+  Service:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: team-ui
+      Cluster: !ImportValue TEAM-ClusterArn
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE
+      PlatformVersion: LATEST
+      HealthCheckGracePeriodSeconds: 30
+      PropagateTags: SERVICE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets: !Split [',', !ImportValue TEAM-PrivateSubnetIds]
+          SecurityGroups:
+            - !ImportValue TEAM-UiTaskSecurityGroupId
+      LoadBalancers:
+        - ContainerName: ui
+          ContainerPort: 8080
+          TargetGroupArn: !ImportValue TEAM-UiTargetGroupArn
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+
+Outputs:
+  ServiceName:
+    Value: !GetAtt Service.Name
+  TaskDefinitionArn:
+    Value: !Ref TaskDefinition

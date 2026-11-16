@@ -23,6 +23,14 @@
     "apiteamGraphQLAPIEndpointOutput": {
       "Type": "String",
       "Default": "apiteamGraphQLAPIEndpointOutput"
+    },
+    "vpcSubnetIds": {
+      "Type": "CommaDelimitedList",
+      "Description": "Private subnet IDs for the Lambda ENIs"
+    },
+    "vpcSecurityGroupId": {
+      "Type": "String",
+      "Description": "TEAM Lambda security group"
     }
   },
   "Conditions": {
@@ -100,7 +108,17 @@
         ],
         "Runtime": "python3.13",
         "Layers": [],
-        "Timeout": 300
+        "Timeout": 300,
+        "VpcConfig": {
+          "SubnetIds": {
+            "Ref": "vpcSubnetIds"
+          },
+          "SecurityGroupIds": [
+            {
+              "Ref": "vpcSecurityGroupId"
+            }
+          ]
+        }
       }
     },
     "LambdaExecutionRole": {
@@ -139,7 +157,12 @@
               ]
             }
           ]
-        }
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+          }
+        ]
       }
     },
     "lambdaexecutionpolicy": {

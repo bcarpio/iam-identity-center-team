@@ -1,0 +1,64 @@
+{
+  "localAdrPath": "docs/adr",
+  "retrieval": {
+    "top_k": 5,
+    "min_score": 0.35,
+    "max_tokens": 4000
+  },
+  "workspaces": {
+    "standards": {
+      "label": "Standards and ADRs",
+      "id": null,
+      "note": "null = omit workspace_id, search all accessible workspaces including Global"
+    }
+  },
+  "chunkTypes": {
+    "amplify-backend": {
+      "description": "Amplify Gen1 backend in amplify/backend/ — AppSync API + override.ts, function CloudFormation templates and parameters.json, custom CFN stacks",
+      "queries": [
+        "AppSync GraphQL API authorization modes and private API standards",
+        "least-privilege IAM policy patterns for Lambda execution roles",
+        "Lambda VPC networking security group and egress patterns",
+        "resource naming conventions and environment parameterization"
+      ]
+    },
+    "lambda": {
+      "description": "Lambda handler source in amplify/backend/function/*/src (Python 3.13 and Node 22)",
+      "queries": [
+        "Lambda handler standards by invocation type API Gateway event-driven internal worker",
+        "Lambda error handling retry semantics and partial batch failure",
+        "structured logging and container-scope client initialization"
+      ]
+    },
+    "deployment": {
+      "description": "CloudFormation stacks, CodeBuild buildspec and shell deploy scripts in deployment/",
+      "queries": [
+        "infrastructure as code version pinning standards",
+        "least-privilege IAM patterns for CI build roles",
+        "AWS resource tagging standards",
+        "UI ingress internal ALB private VPC no WAF"
+      ]
+    },
+    "container": {
+      "description": "UI container image (Dockerfile, nginx config) served on ECS Fargate",
+      "queries": [
+        "Fargate container UI service internal ALB standards",
+        "container image pinning and non-root runtime"
+      ]
+    },
+    "frontend": {
+      "description": "React SPA in src/ using aws-amplify Auth and API",
+      "queries": [
+        "React component structure and state management standards",
+        "frontend API client and error surface conventions"
+      ]
+    },
+    "docs": {
+      "description": "ADRs in docs/adr and operator documentation in docs/",
+      "queries": [
+        "ADR authoring format and when a decision warrants an ADR",
+        "documentation-driven decisions"
+      ]
+    }
+  }
+}

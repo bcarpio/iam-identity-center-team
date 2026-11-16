@@ -6,10 +6,46 @@
 const fs = require("fs");
 const path = require("path");
 
-const { AWS_APP_ID, AWS_BRANCH, SSO_LOGIN, TEAM_ADMIN_GROUP, TEAM_AUDITOR_GROUP, TAGS, CLOUDTRAIL_AUDIT_LOGS, TEAM_ACCOUNT, AMPLIFY_CUSTOM_DOMAIN } = process.env;
+const {
+  SSO_LOGIN,
+  TEAM_ADMIN_GROUP,
+  TEAM_AUDITOR_GROUP,
+  TAGS,
+  CLOUDTRAIL_AUDIT_LOGS,
+  TEAM_ACCOUNT,
+  UI_DOMAIN,
+  COGNITO_DOMAIN_PREFIX,
+  LAMBDA_SUBNET_IDS,
+  LAMBDA_SECURITY_GROUP_ID,
+} = process.env;
+
+// Lambda functions that run inside the VPC. Listed explicitly (never globbed)
+// so only these functions receive a VpcConfig.
+const VPC_FUNCTIONS = [
+  "teamRouter",
+  "teamStatus",
+  "teamgetEntitlement",
+  "teamGetPermissionSets",
+  "teamPublishOUs",
+  "teamgetLogs",
+];
+module.exports = { VPC_FUNCTIONS };
+
+const REQUIRED_ENV_VARS = {
+  UI_DOMAIN,
+  COGNITO_DOMAIN_PREFIX,
+  LAMBDA_SUBNET_IDS,
+  LAMBDA_SECURITY_GROUP_ID,
+};
+for (const [name, value] of Object.entries(REQUIRED_ENV_VARS)) {
+  if (!value || !value.trim()) {
+    console.error(`required environment variable ${name} is not set`);
+    process.exit(1);
+  }
+}
 
 async function update_auth_parameters() {
-  console.log(`updating amplify config for branch "${AWS_BRANCH}"...`);
+  console.log(`updating amplify config for UI domain "${UI_DOMAIN}"...`);
   // update callback/logout redirect urls for build url
   const backendConfig = require(path.resolve(
     "./amplify/backend/backend-config.json"
@@ -22,19 +58,16 @@ async function update_auth_parameters() {
   const oAuthMetadata = JSON.parse(
     authParametersJson.cognitoConfig.oAuthMetadata
   );
-  oAuthMetadata.CallbackURLs.pop();
-  oAuthMetadata.LogoutURLs.pop();
+  const uiUrl = `https://${UI_DOMAIN}/`;
 
-  const amplifyDomain = AMPLIFY_CUSTOM_DOMAIN ? `https://${AMPLIFY_CUSTOM_DOMAIN}/` :`https://${AWS_BRANCH}.${AWS_APP_ID}.amplifyapp.com/`
-
-  console.log("domain",amplifyDomain)
-  oAuthMetadata.CallbackURLs.push(amplifyDomain);
-  oAuthMetadata.LogoutURLs.push(amplifyDomain);
+  console.log("domain", uiUrl);
+  oAuthMetadata.CallbackURLs = [uiUrl];
+  oAuthMetadata.LogoutURLs = [uiUrl];
 
   authParametersJson.cognitoConfig.oAuthMetadata =
     JSON.stringify(oAuthMetadata);
 
-  authParametersJson.cognitoConfig.hostedUIDomainName = AWS_APP_ID;
+  authParametersJson.cognitoConfig.hostedUIDomainName = COGNITO_DOMAIN_PREFIX;
 
   fs.writeFileSync(
     authParametersJsonPath,
@@ -150,9 +183,39 @@ async function update_cloudtrail_parameters() {
   );
 }
 
+async function update_vpc_parameters() {
+  for (const functionName of VPC_FUNCTIONS) {
+    console.log(`updating ${functionName} lambda VPC parameters...`);
+
+    const vpcParametersJsonPath = path.resolve(
+      `./amplify/backend/function/${functionName}/parameters.json`
+    );
+    // A missing function directory means VPC_FUNCTIONS names a function that
+    // does not exist (typo or rename); fail rather than create a stray dir.
+    if (!fs.existsSync(path.dirname(vpcParametersJsonPath))) {
+      console.error(`VPC function ${functionName} not found under amplify/backend/function`);
+      process.exit(1);
+    }
+    // Read from disk rather than require() so earlier writes in this run
+    // (e.g. update_router_parameters) are preserved.
+    const vpcParametersJson = fs.existsSync(vpcParametersJsonPath)
+      ? JSON.parse(fs.readFileSync(vpcParametersJsonPath, "utf8"))
+      : {};
+
+    vpcParametersJson.vpcSubnetIds = LAMBDA_SUBNET_IDS;
+    vpcParametersJson.vpcSecurityGroupId = LAMBDA_SECURITY_GROUP_ID;
+
+    fs.writeFileSync(
+      vpcParametersJsonPath,
+      JSON.stringify(vpcParametersJson, null, 4)
+    );
+  }
+}
+
 update_auth_parameters();
 update_react_parameters();
 update_groups_parameters();
 update_router_parameters()
 update_tag_parameters();
 update_cloudtrail_parameters();
+update_vpc_parameters();

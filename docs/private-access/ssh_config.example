@@ -1,0 +1,18 @@
+# SSH-over-SSM tunnel to the private TEAM UI. See docs/private-access-testing.md.
+#
+# Requires: AWS CLI v2 + session-manager-plugin, and an AWS profile (exported as
+# AWS_PROFILE) that may call ssm:StartSession with AWS-StartSSHSession and
+# ec2-instance-connect:SendSSHPublicKey on the tunnel instance.
+#
+# Find the instance id (it is not fixed; look it up by Name tag):
+#   aws ec2 describe-instances --region us-east-2 \
+#     --filters Name=tag:Name,Values=shared-network-tunnel Name=instance-state-name,Values=running \
+#     --query 'Reservations[].Instances[].InstanceId' --output text
+#
+# Append this block to ~/.ssh/config and replace the HostName.
+Host team-tunnel
+  HostName i-REPLACE_WITH_TUNNEL_INSTANCE_ID
+  User ec2-user
+  ProxyCommand sh -c "aws ssm start-session --target %h --document-name AWS-StartSSHSession --parameters portNumber=%p --region us-east-2"
+  DynamicForward 1080
+  ServerAliveInterval 30

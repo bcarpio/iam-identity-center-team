@@ -1,0 +1,4 @@
+# Build context is the repo root; only the SPA build output and nginx config are needed.
+*
+!build/**
+!deployment/nginx/**

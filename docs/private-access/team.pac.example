@@ -1,0 +1,16 @@
+// Proxy auto-config for testing the private TEAM UI through the SSH-over-SSM
+// tunnel (ssh -N team-tunnel, which listens on 127.0.0.1:1080).
+// See docs/private-access-testing.md.
+//
+// Copy to team.pac and replace REPLACE_UI_DOMAIN with the UI hostname
+// (for example team.example.internal). Adjust the AppSync region if needed.
+function FindProxyForURL(url, host) {
+  // Private-only names: resolve AND connect inside the VPC (SOCKS5 with remote DNS).
+  if (dnsDomainIs(host, "REPLACE_UI_DOMAIN") ||
+      shExpMatch(host, "*.appsync-api.us-east-2.amazonaws.com") ||
+      shExpMatch(host, "*.appsync-realtime-api.us-east-2.amazonaws.com")) {
+    return "SOCKS5 127.0.0.1:1080";
+  }
+  // Everything else — Cognito managed login, IdC portal, fonts — goes direct.
+  return "DIRECT";
+}

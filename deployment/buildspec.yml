@@ -1,0 +1,71 @@
+# CodeBuild buildspec for the TEAM-IDC-APP "Build" project.
+# Source is s3://<SourceBucket>/source.zip (a `git archive HEAD` uploaded by
+# deployment/deploy.sh). Environment variables are set on the project by
+# deployment/template.yml; SOURCE_COMMIT is passed per build by deploy.sh.
+#
+# 1. amplify push the backend (deployment/amplify-headless.sh)
+# 2. npm run build the SPA (needs src/aws-exports.js from step 1)
+# 3. docker build + push the nginx image to ECR (unique, immutable tag)
+# 4. deploy stack TEAM-IDC-UI (deployment/ui-service.yml) with that image
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  install:
+    on-failure: ABORT
+    runtime-versions:
+      nodejs: 22
+      python: 3.13
+    commands:
+      - npm i -g @aws-amplify/cli@14.0.0
+      - pip3 install --user pipenv==2026.7.1
+      - export PATH=$HOME/.local/bin:$PATH
+      - node --version && python3 --version && pipenv --version && amplify --version
+  pre_build:
+    on-failure: ABORT
+    commands:
+      - node parameters.js
+      - npm i -S graphql-ttl-transformer
+      - bash deployment/amplify-headless.sh
+  build:
+    on-failure: ABORT
+    commands:
+      - npm ci
+      - npm run build
+      # Tag = commit (when deploy.sh passed it) + build number. The build
+      # number alone guarantees uniqueness for the IMMUTABLE repository; the S3
+      # object version id is not used because it may contain '/' or '+',
+      # which are invalid in a docker tag.
+      - TAG="$(printf '%s' "${SOURCE_COMMIT:-s3}" | cut -c1-12)-b${CODEBUILD_BUILD_NUMBER}"
+      - IMAGE="$UI_REPOSITORY_URI:$TAG"
+      - echo "Image $IMAGE (source version ${CODEBUILD_RESOLVED_SOURCE_VERSION:-unknown})"
+      - aws ecr get-login-password | docker login --username AWS --password-stdin "${UI_REPOSITORY_URI%%/*}"
+      - docker build -t "$IMAGE" .
+      - docker push "$IMAGE"
+  post_build:
+    commands:
+      - |
+        if [ "${CODEBUILD_BUILD_SUCCEEDING:-0}" != "1" ] || [ -z "${IMAGE:-}" ]; then
+          echo "Build did not succeed; not deploying TEAM-IDC-UI"
+          exit 1
+        fi
+      - |
+        # A stack whose first create failed is left in ROLLBACK_COMPLETE and
+        # cannot be updated; delete it so this deploy can create it again.
+        UI_STATUS="$(aws cloudformation describe-stacks --stack-name TEAM-IDC-UI --query 'Stacks[0].StackStatus' --output text 2>/dev/null || true)"
+        if [ "$UI_STATUS" = "ROLLBACK_COMPLETE" ]; then
+          echo "TEAM-IDC-UI is ROLLBACK_COMPLETE from a failed first create; deleting it"
+          aws cloudformation delete-stack --stack-name TEAM-IDC-UI
+          aws cloudformation wait stack-delete-complete --stack-name TEAM-IDC-UI
+        fi
+      - |
+        TAG_ARGS=()
+        if [ -n "${TAGS:-}" ]; then read -r -a TAG_LIST <<< "$TAGS"; TAG_ARGS=(--tags "${TAG_LIST[@]}"); fi
+        aws cloudformation deploy \
+          --template-file deployment/ui-service.yml \
+          --stack-name TEAM-IDC-UI \
+          --parameter-overrides ImageUri="$IMAGE" \
+          "${TAG_ARGS[@]}" \
+          --no-fail-on-empty-changeset

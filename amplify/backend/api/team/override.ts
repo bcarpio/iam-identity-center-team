@@ -18,5 +18,8 @@ export function override(resources: AmplifyApiGraphQlResourceStackTemplate) {
         ],
       },
     })
+    // Private API: reachable only via the appsync-api interface VPC endpoint.
+    // Immutable after creation — changing it replaces the API.
+    resources.api.GraphQLAPI.addPropertyOverride('Visibility', 'PRIVATE')
   }
 }

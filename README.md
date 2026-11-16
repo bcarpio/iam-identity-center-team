@@ -1,4 +1,44 @@
 # Temporary elevated access management (TEAM) for AWS IAM Identity Center
+
+## This fork
+
+This is a private-ingress fork of TEAM. It serves TEAM only inside a VPC:
+nothing TEAM runs has an inbound path from the internet. The approval
+workflow, data model and IAM Identity Center integration are unchanged.
+
+| Component | Upstream | This fork |
+|---|---|---|
+| SPA hosting | Amplify Hosting (public CloudFront) | nginx on ECS Fargate behind an internal ALB, private hosted zone |
+| AppSync API | Public | `Visibility: PRIVATE`, via the `appsync-api` interface endpoint |
+| Lambdas calling AppSync | No VPC | Private subnets |
+| Build/deploy | Amplify Hosting | CodeBuild (`amplify push`, frontend build, image push, UI service deploy) |
+| Cognito managed login | Public | Still public (AWS offers no private path to it) |
+
+**Region.** Deploy in your IAM Identity Center region. TEAM's Lambdas call
+`sso-admin` and `identitystore` in their own region. The reference deployment
+is us-east-2.
+
+**Network prerequisites (you provide):**
+- A VPC with private subnets in two Availability Zones.
+- Outbound egress from those subnets: NAT, Transit Gateway to an egress VPC,
+  or Transit Gateway to Direct Connect and out through your datacenter.
+- The `appsync-api` interface VPC endpoint with private DNS enabled.
+  Mandatory: a private AppSync API is reachable only through it.
+- Network reachability from your users to the VPC (VPN, Direct Connect,
+  Transit Gateway, or a tunnel).
+
+The rationale, including why Cognito remains public, is in
+[ADR-001: Private ingress](docs/adr/ADR-001-private-ingress.md). To test access
+from outside the VPC, see the
+[private access testing runbook](docs/private-access-testing.md).
+
+This fork is permanently divergent from upstream. It does not track upstream
+PRs, and its changes are not intended to be contributed back.
+
+---
+
+## Upstream TEAM
+
 This repository contains the source code for deploying TEAM application.
 
 TEAM is an open source solution that integrates with AWS IAM Identity Center and allows you to manage and monitor, time-bound elevated access to your multi-account AWS environment at scale.
