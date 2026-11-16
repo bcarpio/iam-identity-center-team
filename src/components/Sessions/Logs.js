@@ -196,8 +196,12 @@ function Logs(props) {
           getLogs(data.queryId);
         } else {
           const expiry = Math.floor(Date.now() / 1000) + 432000 
-          // Add an extra hour to end time to compensate PS session duration
-          const endTime = new Date(Date.parse(props.item.endTime) + 60 * 60 * 1000).toISOString()
+          // Add an extra hour to end time to compensate PS session duration.
+          // The revoke state machine writes endTime straight to DynamoDB a few
+          // seconds after the status change (and not at all if the revoke
+          // fails), so fall back to updatedAt, then now.
+          const ended = Date.parse(props.item.endTime || props.item.updatedAt) || Date.now()
+          const endTime = new Date(ended + 60 * 60 * 1000).toISOString()
           AddSessionLogs(expiry,endTime,username)
         }
       })

@@ -81,7 +81,7 @@ const COLUMN_DEFINITIONS = [
     id: "endTime",
     sortingField: "endTime",
     header: "EndTime",
-    cell: (item) => convertAwsDateTime(item.endTime),
+    cell: (item) => item.endTime ? convertAwsDateTime(item.endTime) : "-",
     minWidth: 10,
   },
   // {
@@ -445,7 +445,7 @@ function Audit(props) {
                   />
                   <ValueWithLabel
                     label="End Time"
-                    children={convertAwsDateTime(selectedItems[0].endTime)}
+                    children={selectedItems[0].endTime ? convertAwsDateTime(selectedItems[0].endTime) : "-"}
                   />
                 </SpaceBetween>
               </ColumnLayout>
