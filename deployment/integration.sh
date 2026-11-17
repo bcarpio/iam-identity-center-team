@@ -30,20 +30,13 @@ cognitouserpoolhostedUIdomain=`aws cognito-idp describe-user-pool --region $REGI
 cognitoClientWebClientID=`aws cognito-idp list-user-pool-clients --region $REGION --user-pool-id $cognitoUserpoolId --output json | jq -r '.UserPoolClients[] | select(.ClientName | contains("clientWeb")) | .ClientId'`
 cognitoHostedUIdomain=$cognitouserpoolhostedUIdomain.auth.$REGION.amazoncognito.com
 
-amplifyAppId=`aws amplify list-apps --region $REGION --output json | jq -r '.apps[] | select(.name=="TEAM-IDC-APP") | .appId'`
-amplifyDomain=`aws amplify list-apps --region $REGION --output json | jq -r '.apps[] | select(.name=="TEAM-IDC-APP") | .defaultDomain'`
-amplifyDomain="main.$amplifyDomain"
-
-amplifyCustomDomains=`aws amplify list-domain-associations --region $REGION --app-id $amplifyAppId --output json`
-amplifyCustomDomain=`echo $amplifyCustomDomains | jq -r 'select(.domainAssociations | length > 0) | .domainAssociations[0].domainName'`
-
-if [ -n "$amplifyCustomDomain" ]; then
-  amplifyCustomDomainPrefix=$(echo $amplifyCustomDomains | jq -r 'select(.domainAssociations | length > 0) | .domainAssociations[0].subDomains[] | select(.subDomainSetting.branchName=="main") | .subDomainSetting.prefix')
-  amplifyDomain=$([ -z "$amplifyCustomDomainPrefix" ] && echo $amplifyCustomDomain || echo $amplifyCustomDomainPrefix.$amplifyCustomDomain)
+# This fork serves the UI from the internal ALB at UI_DOMAIN, not Amplify Hosting.
+if [ -z "${UI_DOMAIN:-}" ]; then
+  echo "UI_DOMAIN is not set in parameters.sh" >&2
+  exit 1
 fi
 
-echo $amplifyDomain
-applicationStartURL="https://$cognitoHostedUIdomain/authorize?client_id=$cognitoClientWebClientID&response_type=code&scope=aws.cognito.signin.user.admin+email+openid+phone+profile&redirect_uri=https://$amplifyDomain/&idp_identifier=team"
+applicationStartURL="https://$cognitoHostedUIdomain/authorize?client_id=$cognitoClientWebClientID&response_type=code&scope=aws.cognito.signin.user.admin+email+openid+phone+profile&redirect_uri=https://$UI_DOMAIN/&idp_identifier=team"
 applicationACSURL="https://$cognitoHostedUIdomain/saml2/idpresponse"
 applicationSAMLAudience="urn:amazon:cognito:sp:$cognitoUserpoolId"
 
