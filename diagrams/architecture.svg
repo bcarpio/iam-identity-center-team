@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 960" width="900" height="960" role="img" aria-labelledby="t d">
   <title id="t">Private TEAM architecture</title>
-  <desc id="d">The browser reaches TEAM only over the corporate network (Direct Connect, VPN or Transit Gateway): an internal ALB with no public IP in front of nginx on ECS Fargate serving the SPA, and the appsync-api interface endpoint in front of an AppSync API with Visibility PRIVATE. The six Lambdas that call AppSync run in the VPC's private subnets and use a NAT gateway for outbound calls to AWS APIs such as Identity Center and Organizations. Session audit logs come from the Control Tower organization trail's CloudWatch log group in the management account, queried with Logs Insights through an assumed role. The only public surface is Cognito managed login, which federates to IAM Identity Center over SAML.</desc>
+  <desc id="d">The browser reaches TEAM only over the corporate network (Direct Connect, VPN or Transit Gateway): an internal ALB with no public IP in front of nginx on ECS Fargate serving the SPA, and the appsync-api interface endpoint in front of an AppSync API with Visibility PRIVATE. The six Lambdas that call AppSync run in the VPC's private subnets and use a NAT gateway for outbound calls to AWS APIs such as Cognito, Identity Center and Organizations. Session audit logs come from the Control Tower organization trail's CloudWatch log group in the management account, queried with Logs Insights through an assumed role. The only public surface is Cognito managed login, which federates to IAM Identity Center over SAML.</desc>
   <defs>
   <style>
   text { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; fill: #0f172a; }
@@ -73,7 +73,7 @@
   <text x="715.0" y="613.0" class="comp-sub" text-anchor="middle">builds and deploys TEAM</text>
   <rect x="310" y="790" width="210" height="72" rx="6" class="net"/>
   <text x="415.0" y="822.0" class="comp-text" text-anchor="middle">AWS APIs</text>
-  <text x="415.0" y="843.0" class="comp-sub" text-anchor="middle">Identity Center, Orgs</text>
+  <text x="415.0" y="843.0" class="comp-sub" text-anchor="middle">Cognito, IdC, Orgs</text>
   <rect x="560" y="760" width="310" height="130" rx="6" class="account"/>
   <text x="580" y="790" class="account-label" text-anchor="start">Management account</text>
   <rect x="580" y="806" width="270" height="70" rx="6" class="comp"/>

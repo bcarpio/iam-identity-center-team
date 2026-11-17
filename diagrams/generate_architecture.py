@@ -118,7 +118,7 @@ s.comp(580, 440, 270, 72, "TEAM backend", "DynamoDB, Step Functions")
 s.comp(580, 560, 270, 72, "CodeBuild", "builds and deploys TEAM", cls="comp-dim")
 
 # Row 3: what the NAT reaches, and the management account.
-s.comp(310, 790, 210, 72, "AWS APIs", "Identity Center, Orgs", cls="net")
+s.comp(310, 790, 210, 72, "AWS APIs", "Cognito, IdC, Orgs", cls="net")
 s.rect(560, 760, 310, 130, "account")
 s.text(580, 790, "Management account", "account-label")
 s.comp(580, 806, 270, 70, "Org trail log group", "CloudWatch Logs Insights")
@@ -156,8 +156,8 @@ s.write(
     "The browser reaches TEAM only over the corporate network (Direct Connect, VPN or Transit Gateway): "
     "an internal ALB with no public IP in front of nginx on ECS Fargate serving the SPA, and the appsync-api "
     "interface endpoint in front of an AppSync API with Visibility PRIVATE. The six Lambdas that call AppSync "
-    "run in the VPC's private subnets and use a NAT gateway for outbound calls to AWS APIs such as Identity "
-    "Center and Organizations. Session audit logs come from the Control Tower organization trail's CloudWatch "
+    "run in the VPC's private subnets and use a NAT gateway for outbound calls to AWS APIs such as Cognito, "
+    "Identity Center and Organizations. Session audit logs come from the Control Tower organization trail's CloudWatch "
     "log group in the management account, queried with Logs Insights through an assumed role. The only public "
     "surface is Cognito managed login, which federates to IAM Identity Center over SAML.",
 )

@@ -118,38 +118,50 @@ reference deployment is **us-east-2**.
 TEAM does not create a VPC. The adopter provides:
 
 - A VPC with private subnets in at least two Availability Zones.
-- A path from those subnets to the AWS APIs TEAM calls: internet egress (a
-  NAT gateway; Transit Gateway to a DMZ/egress VPC; or Transit Gateway to
-  Direct Connect to a datacenter and out), **or** VPC endpoints for every one
-  of them (below).
+- Outbound egress from those subnets to the AWS APIs TEAM calls. Any of
+  these works: a NAT gateway; Transit Gateway to a DMZ/egress VPC; or Transit
+  Gateway to Direct Connect to a datacenter and out. With VPC endpoints for
+  the rest (below), the one hostname that must still be reachable outbound is
+  `cognito-idp.<region>.amazonaws.com` on 443.
 - The `appsync-api` interface VPC endpoint with private DNS enabled. This one
   endpoint is **mandatory**: a private AppSync API is reachable only through
   it.
 
-**Running with no internet egress.** Everything inside the VPC can reach its
-AWS APIs through endpoints instead of NAT:
+**Narrowing egress with VPC endpoints.** Every AWS API TEAM calls from inside
+the VPC except Cognito can go through an endpoint. Tested 2026-11-17 in the
+reference deployment with the NAT gateway removed:
 
-| Caller | Service | Endpoint |
-|---|---|---|
-| Lambdas | IAM Identity Center (`sso-admin`) | `com.amazonaws.<region>.sso` |
-| Lambdas | Identity Store | `com.amazonaws.<region>.identitystore` |
-| Lambdas | Step Functions | `com.amazonaws.<region>.states` |
-| Lambdas | Cognito user pools | `com.amazonaws.<region>.cognito-idp` |
-| Lambdas | STS (audit-log role) | `com.amazonaws.<region>.sts` |
-| Lambdas, Fargate | CloudWatch Logs | `com.amazonaws.<region>.logs` |
-| Lambdas | CloudTrail (only with a CloudTrail Lake backend) | `com.amazonaws.<region>.cloudtrail` |
-| Lambdas | DynamoDB | gateway endpoint |
-| Fargate | ECR image pull | `ecr.api`, `ecr.dkr`, and the S3 gateway endpoint |
-| Lambdas | **Organizations** | `com.amazonaws.us-east-1.organizations` only |
+| Caller | Service | Endpoint | Result |
+|---|---|---|---|
+| Lambdas | IAM Identity Center (`sso-admin`) | `com.amazonaws.<region>.sso` | works |
+| Lambdas | Identity Store | `com.amazonaws.<region>.identitystore` | works |
+| Lambdas | Step Functions | `com.amazonaws.<region>.states` | works |
+| Lambdas | STS (audit-log role) | `com.amazonaws.<region>.sts` | works |
+| Lambdas, Fargate | CloudWatch Logs | `com.amazonaws.<region>.logs` | works |
+| Lambdas | CloudTrail (only with a CloudTrail Lake backend) | `com.amazonaws.<region>.cloudtrail` | not tested |
+| Lambdas | DynamoDB | gateway endpoint | works |
+| Fargate | ECR image pull | `ecr.api`, `ecr.dkr`, and the S3 gateway endpoint | works |
+| Lambdas | Organizations | `com.amazonaws.us-east-1.organizations`, cross-region | works |
+| Lambdas | **Cognito user pools** | **none: do not create one** | **breaks TEAM** |
 
-Organizations is the exception. It is a global service and its interface
-endpoint exists only in us-east-1. From any other region, create it as a
-cross-region interface endpoint (requires the `vpce:AllowMultiRegion`
-permission on `ec2:CreateVpcEndpoint`; cross-region data transfer is billed),
-or reach a us-east-1 endpoint over Transit Gateway or peering, which is the
-route the Organizations documentation describes. CodeBuild runs outside the
-VPC and is not affected. The endpoint-only configuration has not been tested
-in the reference deployment.
+**Do not put a `cognito-idp` interface endpoint with private DNS in front of
+TEAM's VPC.** TEAM's user pool has a managed login domain, and Cognito
+rejects API calls that arrive through PrivateLink for any user pool with a
+domain (the Cognito developer guide: "User pools with domains assigned are
+incompatible with AWS PrivateLink"). Private DNS makes the endpoint capture
+`cognito-idp.<region>.amazonaws.com` for the whole VPC, so `teamRouter`'s
+`ListUsers` call fails with `PrivateLink access is disabled for the user pool
+that has ManagedLogin configured` and requests never activate. This happens
+**even when NAT is present**, and equally with a central endpoint shared into
+the VPC through a Route 53 profile or shared private hosted zone. TEAM
+therefore always needs an outbound path to that one public hostname.
+
+Organizations is a global service and its interface endpoint exists only in
+us-east-1. From any other region, create it as a cross-region interface
+endpoint (requires the `vpce:AllowMultiRegion` permission on
+`ec2:CreateVpcEndpoint`; cross-region data transfer is billed), or reach a
+us-east-1 endpoint over Transit Gateway or peering. CodeBuild runs outside
+the VPC and is not affected.
 
 The reference implementation uses one NAT gateway, the `appsync-api`
 interface endpoint, and the free S3 and DynamoDB gateway endpoints. In the
@@ -177,10 +189,10 @@ route out.
 ### Tradeoffs
 
 - **Cost.** A NAT gateway plus one interface endpoint, roughly $45/month in
-  the lab, on top of the Fargate task and internal ALB. The endpoint-only
-  option replaces the NAT gateway with about nine more interface endpoints,
-  roughly $130/month across two Availability Zones: more expensive for a
-  deployment this small, and chosen for policy (no internet route), not cost.
+  the lab, on top of the Fargate task and internal ALB. Narrowing egress
+  to Cognito alone takes about eight more interface endpoints, roughly
+  $115/month across two Availability Zones: a choice made for policy, not
+  cost.
 - **Permanent fork.** Upstream will not take this change; it removes Amplify
   Hosting, which is upstream's deployment model. This fork does not track
   upstream PRs and is maintained independently.

@@ -145,10 +145,18 @@ Browser setup:
   v5**. A PAC `SOCKS5` result already implies remote DNS in Firefox, so the
   tick box is belt and braces. A dedicated Firefox profile keeps this
   separate from everyday browsing.
-- **Chrome / Chromium:** launch with
-  `--proxy-pac-url=file:///home/<you>/team.pac`. A separate
-  `--user-data-dir` is recommended, so the flag is not overridden by an existing
-  browser process. Chrome always resolves DNS remotely for SOCKS5 proxies.
+- **Chrome / Chromium:** current Chrome ignores `file://` PAC URLs (the page
+  fails with `DNS_PROBE_FINISHED_NXDOMAIN` because the name was resolved
+  locally). Pass the PAC script inline as a data URL instead:
+  `--proxy-pac-url="data:application/x-ns-proxy-autoconfig;base64,$(base64 -w0 ~/team.pac)"`.
+  A separate `--user-data-dir` is recommended, so the flag is not overridden
+  by an existing browser process. Chrome always resolves DNS remotely for
+  SOCKS5 proxies.
+
+Do not shortcut the PAC file with `--proxy-server=socks5://...`. That sends
+Cognito managed login and the IdC portal through the tunnel too, which only
+works while the tunnel host has internet egress; without it, sign-in times
+out.
 
 > AppSync private DNS only works when the hostname is resolved **inside** the
 > VPC. If the laptop resolves it, the request goes to the public AppSync
