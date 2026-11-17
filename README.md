@@ -45,8 +45,32 @@ Beyond private ingress:
   `CLOUDTRAIL_AUDIT_LOGS=cwlogs://<log-group>` and `CWLOGS_ASSUME_ROLE_ARN`;
   see [cwlogs.md](docs/docs/deployment/configuration/cwlogs.md).
   `CLOUDTRAIL_AUDIT_LOGS=none` no longer creates an event data store.
+  **Retention:** Logs Insights can only read what the log group still holds.
+  Control Tower sets `aws-controltower/CloudTrailLogs` to 14 days, so TEAM's
+  session audit view goes back 14 days unless you raise that retention.
 - **Revoked requests** show "-" for the missing end time instead of a 1969
   or 1970 date.
+
+### The public login page still needs hardening
+
+Cognito managed login is the one internet-facing surface left, so treat it
+as one:
+
+- **It takes no passwords.** `cognito.sh` sets IAM Identity Center as the web
+  client's only identity provider, so the login page redirects to IdC, which
+  owns credentials, MFA and lockout.
+- **Attach AWS WAF to the user pool.** Cognito user pools accept a regional
+  web ACL. Use rate-based rules and the AWS managed rule groups. This fork
+  does not create one.
+- **Turn off self sign-up.** Upstream's Amplify auth config does not set
+  `AllowAdminCreateUserOnly`, so anyone holding the public client ID may be
+  able to create a Cognito user that did not come from IdC. In this fork that
+  user cannot reach the private AppSync API, but disable it anyway. Set it in
+  the Amplify auth resource, not with `aws cognito-idp update-user-pool`:
+  that call resets every setting you omit, and the next `amplify push`
+  reverts it.
+- **Alert on sign-in anomalies.** Cognito API calls land in CloudTrail; alert
+  on `SignUp` and unexpected token activity.
 
 ### Why this will not be merged upstream
 
