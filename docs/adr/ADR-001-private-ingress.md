@@ -118,12 +118,38 @@ reference deployment is **us-east-2**.
 TEAM does not create a VPC. The adopter provides:
 
 - A VPC with private subnets in at least two Availability Zones.
-- **Outbound** egress from those subnets. Any of these works: a NAT gateway;
-  Transit Gateway to a DMZ/egress VPC; or Transit Gateway to Direct Connect to
-  a datacenter and out to the internet.
+- A path from those subnets to the AWS APIs TEAM calls: internet egress (a
+  NAT gateway; Transit Gateway to a DMZ/egress VPC; or Transit Gateway to
+  Direct Connect to a datacenter and out), **or** VPC endpoints for every one
+  of them (below).
 - The `appsync-api` interface VPC endpoint with private DNS enabled. This one
   endpoint is **mandatory**: a private AppSync API is reachable only through
-  it. Every other AWS API may go out through egress.
+  it.
+
+**Running with no internet egress.** Everything inside the VPC can reach its
+AWS APIs through endpoints instead of NAT:
+
+| Caller | Service | Endpoint |
+|---|---|---|
+| Lambdas | IAM Identity Center (`sso-admin`) | `com.amazonaws.<region>.sso` |
+| Lambdas | Identity Store | `com.amazonaws.<region>.identitystore` |
+| Lambdas | Step Functions | `com.amazonaws.<region>.states` |
+| Lambdas | Cognito user pools | `com.amazonaws.<region>.cognito-idp` |
+| Lambdas | STS (audit-log role) | `com.amazonaws.<region>.sts` |
+| Lambdas, Fargate | CloudWatch Logs | `com.amazonaws.<region>.logs` |
+| Lambdas | CloudTrail (only with a CloudTrail Lake backend) | `com.amazonaws.<region>.cloudtrail` |
+| Lambdas | DynamoDB | gateway endpoint |
+| Fargate | ECR image pull | `ecr.api`, `ecr.dkr`, and the S3 gateway endpoint |
+| Lambdas | **Organizations** | `com.amazonaws.us-east-1.organizations` only |
+
+Organizations is the exception. It is a global service and its interface
+endpoint exists only in us-east-1. From any other region, create it as a
+cross-region interface endpoint (requires the `vpce:AllowMultiRegion`
+permission on `ec2:CreateVpcEndpoint`; cross-region data transfer is billed),
+or reach a us-east-1 endpoint over Transit Gateway or peering, which is the
+route the Organizations documentation describes. CodeBuild runs outside the
+VPC and is not affected. The endpoint-only configuration has not been tested
+in the reference deployment.
 
 The reference implementation uses one NAT gateway, the `appsync-api`
 interface endpoint, and the free S3 and DynamoDB gateway endpoints. In the
@@ -151,7 +177,10 @@ route out.
 ### Tradeoffs
 
 - **Cost.** A NAT gateway plus one interface endpoint, roughly $45/month in
-  the lab, on top of the Fargate task and internal ALB.
+  the lab, on top of the Fargate task and internal ALB. The endpoint-only
+  option replaces the NAT gateway with about nine more interface endpoints,
+  roughly $130/month across two Availability Zones: more expensive for a
+  deployment this small, and chosen for policy (no internet route), not cost.
 - **Permanent fork.** Upstream will not take this change; it removes Amplify
   Hosting, which is upstream's deployment model. This fork does not track
   upstream PRs and is maintained independently.

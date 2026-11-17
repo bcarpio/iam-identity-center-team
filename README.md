@@ -25,8 +25,11 @@ is us-east-2.
 
 **Network prerequisites (you provide):**
 - A VPC with private subnets in two Availability Zones.
-- Outbound egress from those subnets: NAT, Transit Gateway to an egress VPC,
-  or Transit Gateway to Direct Connect and out through your datacenter.
+- A path to the AWS APIs TEAM calls: outbound egress (NAT, Transit Gateway
+  to an egress VPC, or Direct Connect out through your datacenter), or VPC
+  endpoints for each of them if your accounts have no internet route. The
+  endpoint list, and the one catch (Organizations' endpoint exists only in
+  us-east-1), are in ADR-001.
 - The `appsync-api` interface VPC endpoint with private DNS enabled.
   Mandatory: a private AppSync API is reachable only through it.
 - Network reachability from your users to the VPC (VPN, Direct Connect,
